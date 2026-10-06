@@ -1,0 +1,6 @@
+.DS_Store
+local_*/
+node_modules/
+.gc/
+worktrees/
+.claude/skills/

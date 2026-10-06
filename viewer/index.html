@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swarm model viewer</title>
+<style>
+:root { --bg:#f6f4ee; --panel:#ffffff; --ink:#1d2a24; --muted:#6b776f; --line:#d9d6cc; --accent:#0f3d2e; --gold:#b8902f;
+  --added:#2e8b57; --removed:#b03a2e; --changed:#d49a1a; --idle:#c9c6bb; --nodata:#bdbdb5; --flag:#b03a2e; --hl:#1b5e42; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0f1a15; --panel:#15241d; --ink:#f0ece0; --muted:#9aa89f; --line:#2b3b33; --accent:#c9a24b; --gold:#c9a24b; --idle:#3a4a42; --nodata:#2f3d36; --hl:#c9a24b; } }
+:root[data-theme="dark"] { --bg:#0f1a15; --panel:#15241d; --ink:#f0ece0; --muted:#9aa89f; --line:#2b3b33; --accent:#c9a24b; --gold:#c9a24b; --idle:#3a4a42; --nodata:#2f3d36; --hl:#c9a24b; }
+* { box-sizing:border-box }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; display:grid; grid-template-columns:280px 1fr 360px; grid-template-rows:48px 1fr; height:100vh; }
+header { grid-column:1/4; display:flex; align-items:center; gap:16px; padding:0 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+header h1 { font-size:15px; margin:0; letter-spacing:.04em; text-transform:uppercase; color:var(--accent); }
+header .crumbs { color:var(--muted); font-size:13px; }
+aside, #detail { background:var(--panel); overflow:auto; padding:12px 16px; border-right:1px solid var(--line); }
+#detail { border-right:0; border-left:1px solid var(--line); }
+label.f { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:12px 0 4px; }
+select, input[type=search], button { width:100%; font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); }
+button { cursor:pointer; width:auto; }
+button.on { background:var(--accent); color:var(--panel); border-color:var(--accent); }
+.row { display:flex; gap:6px; flex-wrap:wrap; }
+#stage { position:relative; overflow:hidden; background:var(--bg); }
+svg { width:100%; height:100%; display:block; cursor:grab; }
+svg.panning { cursor:grabbing }
+.node rect { stroke-width:1.5; rx:6; }
+.node text { font-size:11px; pointer-events:none; }
+.node.sel rect { stroke:var(--hl); stroke-width:3; }
+.node.dim { opacity:.25 }
+.edge { fill:none; stroke:var(--muted); stroke-opacity:.45; stroke-width:1; }
+.edge.added { stroke:var(--added); stroke-opacity:.9; stroke-width:1.6 }
+.edge.removed { stroke:var(--removed); stroke-dasharray:4 3; stroke-opacity:.9 }
+.edge.inheritance { stroke-dasharray:1 0; stroke-width:1.8 }
+.rank-label { font-size:10px; fill:var(--muted); text-transform:uppercase; letter-spacing:.08em }
+.legend { position:absolute; left:12px; bottom:12px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:11px; display:flex; gap:12px; flex-wrap:wrap; max-width:70%; }
+.sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
+h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:16px 0 6px; }
+h3 { font-size:14px; margin:4px 0; word-break:break-all }
+.k { color:var(--muted) } .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px }
+ul { margin:4px 0; padding-left:18px } li { margin:2px 0 }
+.pill { display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px; border:1px solid var(--line); margin:1px 2px 1px 0 }
+.pill.added { border-color:var(--added); color:var(--added) } .pill.removed { border-color:var(--removed); color:var(--removed) } .pill.changed { border-color:var(--changed); color:var(--changed) }
+.pill.flag { border-color:var(--flag); color:var(--flag) }
+a { color:var(--accent) }
+.bead { border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin:6px 0; }
+.bead .t { font-weight:600 } .bead .m { color:var(--muted); font-size:12px }
+.note { background:var(--bg); border-left:3px solid var(--gold); padding:6px 8px; margin:6px 0; font-size:13px }
+table { border-collapse:collapse; width:100%; font-size:12px } td, th { text-align:left; padding:3px 6px; border-bottom:1px solid var(--line) } th { color:var(--muted); font-weight:500 }
+.cap-layer { border:1px solid var(--line); border-radius:10px; padding:8px 12px; margin:10px 16px; background:var(--panel) }
+.cap-layer h4 { margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--accent) }
+.cap-items { display:flex; flex-wrap:wrap; gap:8px }
+.cap { border:1px solid var(--line); border-radius:8px; padding:6px 10px; cursor:pointer; min-width:140px; background:var(--bg) }
+.cap:hover, .cap.sel { border-color:var(--hl); box-shadow:0 0 0 2px var(--hl) inset }
+.cap .n { font-weight:600; font-size:13px } .cap .c { color:var(--muted); font-size:11px }
+#caps { position:absolute; inset:0; overflow:auto; padding:8px 0; display:none; background:var(--bg) }
+.empty { color:var(--muted); padding:24px; text-align:center }
+@media (max-width: 900px) { body { grid-template-columns:1fr; grid-template-rows:48px auto 60vh auto } aside, #detail { border:0; border-bottom:1px solid var(--line) } }
+</style>
+</head>
+<body>
+<header><h1>Swarm model viewer</h1><span class="crumbs" id="crumbs">loading local_data/index.json</span></header>
+<aside>
+  <label class="f">Rig</label><select id="rig"></select>
+  <label class="f">View</label>
+  <div class="row"><button id="mode-model" class="on">Model</button><button id="mode-wave">Wave</button><button id="mode-caps">Capabilities</button></div>
+  <label class="f" id="snap-label">Snapshot</label><select id="snap"></select>
+  <label class="f">Wave (delta)</label><select id="delta"></select>
+  <label class="f">Color by</label>
+  <div class="row"><button id="col-wave" class="on">wave</button><button id="col-metrics">metrics</button><button id="col-folder">folder</button></div>
+  <label class="f">Filter</label>
+  <input type="search" id="q" placeholder="module, member, folder">
+  <div class="row" style="margin-top:6px"><button id="hide-tests" class="on">hide tests</button><button id="only-flagged">flagged only</button><button id="only-changed">changed only</button></div>
+  <h2>Summary</h2><div id="summary" class="mono"></div>
+  <h2>Beads in this wave</h2><div id="beads"></div>
+</aside>
+<main id="stage">
+  <svg id="svg"><g id="root"></g></svg>
+  <div id="caps"></div>
+  <div class="legend" id="legend"></div>
+</main>
+<section id="detail"><div class="empty">Select a module. Double-click opens it in VS Code.</div></section>
+<script>
+const $ = (s) => document.querySelector(s)
+const state = { index: null, rigKey: null, snap: null, delta: null, caps: null, mode: 'model', color: 'wave', q: '', hideTests: true, onlyFlagged: false, onlyChanged: false, sel: null, capSel: null }
+const DATA = '../local_data/'
+const fetchJson = async (u) => { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error(`${r.status} ${u}`); return r.json() }
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const short = (s) => (s || '').slice(0, 7)
+const vscode = (rigPath, p, line) => `vscode://file${rigPath}/${p}${line ? ':' + line : ''}`
+
+async function init() {
+  try { state.index = await fetchJson(DATA + 'index.json') } catch (e) { $('#crumbs').textContent = 'no local_data/index.json yet: run bin/snapshot.mjs first'; return }
+  const keys = Object.keys(state.index.rigs).sort()
+  $('#rig').innerHTML = keys.map((k) => `<option value="${esc(k)}">${esc(k)}</option>`).join('')
+  const saved = (() => { try { return localStorage.getItem('swarmview.rig') } catch { return null } })()
+  state.rigKey = keys.includes(saved) ? saved : keys[0]
+  $('#rig').value = state.rigKey
+  await loadRig()
+}
+async function loadRig() {
+  try { localStorage.setItem('swarmview.rig', state.rigKey) } catch {}
+  const r = state.index.rigs[state.rigKey]
+  const snaps = Object.values(r.snapshots).sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  $('#snap').innerHTML = snaps.map((s) => `<option value="${s.sha}">${short(s.sha)} ${esc(s.ref)} · ${esc((s.date || '').slice(0, 10))} · ${s.counts.modules} mod</option>`).join('')
+  const deltas = Object.values(r.deltas).sort((a, b) => (b.generated || '').localeCompare(a.generated || ''))
+  $('#delta').innerHTML = deltas.map((d) => `<option value="${esc(d.id)}">${esc(d.id)} · +${d.counts.added} -${d.counts.removed} ~${d.counts.changed} · ${d.counts.beads} beads</option>`).join('') || '<option value="">no deltas yet</option>'
+  state.caps = null
+  try { state.caps = await fetchJson(`../capabilities/${r.rig}.json`) } catch {}
+  await loadSelection()
+}
+async function loadSelection() {
+  const r = state.index.rigs[state.rigKey]
+  const deltaId = $('#delta').value
+  state.delta = deltaId ? await fetchJson(`${DATA}${r.city}/${r.rig}/deltas/${encodeURIComponent(deltaId)}.json`) : null
+  const sha = state.mode === 'wave' && state.delta ? state.delta.head.sha : $('#snap').value
+  if (state.mode === 'wave' && state.delta) $('#snap').value = sha
+  state.snap = await fetchJson(`${DATA}${r.city}/${r.rig}/snapshots/${sha}.json`)
+  state.sel = null
+  render()
+}
+
+// ---- status of each module under the current delta ----
+function statusMap() {
+  const m = new Map()
+  if (!state.delta) return m
+  for (const n of state.delta.nodes.added) m.set(n.id, 'added')
+  for (const n of state.delta.nodes.changed) m.set(n.id, n.structural ? 'changed' : (n.measured ? 'measured' : 'text'))
+  for (const n of state.delta.nodes.removed) m.set(n.id, 'removed')
+  for (const n of state.delta.nodes.renamed) { m.set(n.to, 'added'); m.set(n.from, 'removed') }
+  return m
+}
+const FOLDER_HUES = {}
+const folderColor = (f) => { if (!(f in FOLDER_HUES)) FOLDER_HUES[f] = (Object.keys(FOLDER_HUES).length * 47) % 360; return `hsl(${FOLDER_HUES[f]} 45% 55%)` }
+const gradeColor = (g) => g == null ? 'var(--nodata)' : `hsl(${Math.round((g - 1) / 9 * 120)} 60% 45%)`
+function fillFor(m, st) {
+  if (state.color === 'folder') return folderColor(m.folder)
+  if (state.color === 'metrics') return gradeColor(m.metrics?.grade)
+  return { added: 'var(--added)', changed: 'var(--changed)', measured: 'var(--changed)', text: 'var(--changed)', removed: 'var(--removed)' }[st] || 'var(--idle)'
+}
+
+// ---- layout: rows by dependency rank (leaves at the bottom), grouped by folder within a row ----
+function layout(modules, edges) {
+  const ids = new Set(modules.map((m) => m.id))
+  const out = new Map(modules.map((m) => [m.id, []]))
+  for (const e of edges) if (ids.has(e.from) && ids.has(e.to)) out.get(e.from).push(e.to)
+  const rank = new Map(), visiting = new Set()
+  const rk = (id) => { if (rank.has(id)) return rank.get(id); if (visiting.has(id)) return 0; visiting.add(id); const r = out.get(id).length ? 1 + Math.max(...out.get(id).map(rk)) : 0; visiting.delete(id); rank.set(id, r); return r }
+  modules.forEach((m) => rk(m.id))
+  const maxR = Math.max(0, ...rank.values())
+  const rows = Array.from({ length: maxR + 1 }, () => [])
+  for (const m of modules) rows[maxR - rank.get(m.id)].push(m)
+  const W = 150, H = 46, GX = 18, GY = 70, pos = new Map()
+  let maxW = 0
+  rows.forEach((row, ri) => {
+    row.sort((a, b) => a.folder.localeCompare(b.folder) || a.id.localeCompare(b.id))
+    let x = 0, prevFolder = null
+    row.forEach((m) => { if (prevFolder !== null && prevFolder !== m.folder) x += 24; pos.set(m.id, { x, y: ri * (H + GY), w: W, h: H }); x += W + GX; prevFolder = m.folder })
+    maxW = Math.max(maxW, x)
+  })
+  for (const row of rows) { const rowW = row.length ? pos.get(row[row.length - 1].id).x + W : 0; const off = (maxW - rowW) / 2; for (const m of row) pos.get(m.id).x += off }
+  return { pos, W, H, rows: rows.length, width: maxW, height: rows.length * (H + GY) }
+}
+
+let view = { x: 20, y: 20, k: 1 }
+function render() {
+  const S = state.snap, st = statusMap(), r = state.index.rigs[state.rigKey]
+  $('#crumbs').textContent = `${state.rigKey} · ${short(S.sha)} ${S.ref} · ${S.subject}`
+  $('#caps').style.display = state.mode === 'caps' ? 'block' : 'none'
+  $('#svg').style.display = state.mode === 'caps' ? 'none' : 'block'
+  $('#snap-label').textContent = state.mode === 'wave' ? 'Snapshot (head of wave)' : 'Snapshot'
+  const removedNodes = state.mode === 'wave' && state.delta ? state.delta.nodes.removed.map((n) => ({ ...n, folder: n.path.split('/').slice(0, -1).join('/') || '.', imports: [], members: n.members.map((x) => ({ name: x })), removed: true })) : []
+  let modules = [...S.modules, ...removedNodes]
+  const q = state.q.toLowerCase()
+  const capMods = state.capSel ? new Set(state.capSel.modules || []) : null
+  modules = modules.filter((m) => (!state.hideTests || m.role !== 'test') && (!state.onlyFlagged || m.flags) && (!state.onlyChanged || st.has(m.id)) && (!q || m.id.toLowerCase().includes(q) || (m.members || []).some((x) => x.name.toLowerCase().includes(q))))
+  const ids = new Set(modules.map((m) => m.id))
+  const edgeList = [...S.edges.map((e) => ({ ...e, status: state.delta && state.delta.edges.added.includes(`${e.from} -> ${e.to}`) ? 'added' : '' }))]
+  if (state.mode === 'wave' && state.delta) for (const e of state.delta.edges.removed) { const [from, to] = e.split(' -> '); edgeList.push({ from, to, kind: 'dependency', status: 'removed' }) }
+  const L = layout(modules, edgeList)
+  const g = $('#root'); g.innerHTML = ''
+  const ns = 'http://www.w3.org/2000/svg', el = (t, a = {}) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e }
+  for (const e of edgeList) {
+    if (!ids.has(e.from) || !ids.has(e.to)) continue
+    const a = L.pos.get(e.from), b = L.pos.get(e.to)
+    const x1 = a.x + a.w / 2, y1 = a.y + a.h, x2 = b.x + b.w / 2, y2 = b.y
+    const p = el('path', { d: `M${x1},${y1} C${x1},${y1 + 35} ${x2},${y2 - 35} ${x2},${y2}`, class: `edge ${e.status} ${e.kind}` })
+    p.dataset.from = e.from; p.dataset.to = e.to
+    g.appendChild(p)
+  }
+  for (const m of modules) {
+    const p = L.pos.get(m.id), s = st.get(m.id)
+    const n = el('g', { class: `node${state.sel === m.id ? ' sel' : ''}${capMods && !capMods.has(m.id) ? ' dim' : ''}`, transform: `translate(${p.x},${p.y})` })
+    const fill = fillFor(m, s)
+    n.appendChild(el('rect', { width: p.w, height: p.h, fill, 'fill-opacity': state.color === 'wave' && !s ? .35 : .85, stroke: m.flags ? 'var(--flag)' : 'var(--line)', 'stroke-dasharray': m.removed ? '5 3' : '' }))
+    const t1 = el('text', { x: 8, y: 18, fill: '#fff', 'font-weight': 600 }); t1.textContent = m.id.split('/').pop().slice(0, 20); n.appendChild(t1)
+    const t2 = el('text', { x: 8, y: 34, fill: '#fff', 'fill-opacity': .85 }); t2.textContent = `${m.folder.split('/').slice(-2).join('/')} · ${m.lines ?? ''}${m.flags ? ' ⚑' : ''}${m.metrics?.grade ? ' g' + m.metrics.grade : ''}`; n.appendChild(t2)
+    n.addEventListener('click', () => { state.sel = m.id; render() })
+    n.addEventListener('dblclick', () => { window.location.href = vscode(r.rigPath, m.path, (m.members || [])[0]?.line) })
+    g.appendChild(n)
+  }
+  const svg = $('#svg'), box = svg.getBoundingClientRect()
+  if (!render.fitted || render.lastRig !== state.rigKey) { const k = Math.min(1, (box.width - 40) / Math.max(1, L.width), (box.height - 40) / Math.max(1, L.height)); view = { x: (box.width - L.width * k) / 2, y: 20, k }; render.fitted = true; render.lastRig = state.rigKey }
+  g.setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`)
+  $('#legend').innerHTML = state.color === 'wave'
+    ? `<span><i class="sw" style="background:var(--added)"></i>added</span><span><i class="sw" style="background:var(--changed)"></i>changed</span><span><i class="sw" style="background:var(--removed)"></i>removed (dashed)</span><span><i class="sw" style="background:var(--idle)"></i>unchanged</span><span><i class="sw" style="border:2px solid var(--flag)"></i>threshold flag</span><span>rows: importers above, leaves below</span>`
+    : state.color === 'metrics' ? `<span><i class="sw" style="background:${gradeColor(1)}"></i>grade 1</span><span><i class="sw" style="background:${gradeColor(5)}"></i>5</span><span><i class="sw" style="background:${gradeColor(10)}"></i>10</span><span><i class="sw" style="background:var(--nodata)"></i>no data</span><span>grade = mean(coverage, mutation kill rate), capped at 5 with any CRAP over 30</span>`
+    : [...new Set(modules.map((m) => m.folder))].sort().map((f) => `<span><i class="sw" style="background:${folderColor(f)}"></i>${esc(f)}</span>`).join('')
+  renderSummary(); renderBeads(); renderDetail(); renderCaps()
+}
+function renderSummary() {
+  const S = state.snap, D = state.delta, c = S.counts
+  let h = `modules ${c.modules} (tests ${c.tests}) · edges ${c.edges}<br>flagged ${c.flagged} · with metrics ${c.withMetrics}`
+  if (S.metricsNote?.source) h += `<br>metrics from ${esc(S.metricsNote.source)}`
+  if (state.mode === 'wave' && D) h += `<hr>wave ${esc(D.id)}<br>${short(D.base.sha)} → ${short(D.head.sha)}<br>+${D.counts.added} added · −${D.counts.removed} removed<br>~${D.counts.changed} changed (${D.counts.structural} structural)<br>edges +${D.counts.edgesAdded} −${D.counts.edgesRemoved}<br>commits ${D.counts.commits} · flags raised ${D.counts.flagsRaised}`
+  $('#summary').innerHTML = h
+}
+function renderBeads() {
+  const D = state.delta, r = state.index.rigs[state.rigKey]
+  if (!D || !D.beads.length) { $('#beads').innerHTML = '<div class="k">none joined to this wave</div>'; return }
+  $('#beads').innerHTML = D.beads.map((b) => `<div class="bead"><div class="t">${esc(b.id)} ${esc(b.title)}</div><div class="m">${esc(b.status)}${b.outcome ? ' · ' + esc(b.outcome) : ''}${b.commit ? ' · ' + short(b.commit) : ''}${b.branch ? ' · ' + esc(b.branch) : ''}</div>${b.labels.map((l) => `<span class="pill">${esc(l)}</span>`).join('')}${b.shiftNote ? `<div class="note">${esc(b.shiftNote)}</div>` : '<div class="m">no shift note on the bead</div>'}${b.verification ? `<div class="m">verification: ${esc(b.verification)}</div>` : ''}</div>`).join('')
+}
+function renderDetail() {
+  const S = state.snap, D = state.delta, r = state.index.rigs[state.rigKey]
+  const m = S.modules.find((x) => x.id === state.sel) || (D && D.nodes.removed.find((x) => x.id === state.sel))
+  if (!m) { $('#detail').innerHTML = '<div class="empty">Select a module. Double-click opens it in VS Code.</div>'; return }
+  const st = statusMap().get(m.id)
+  const importers = S.edges.filter((e) => e.to === m.id).map((e) => e.from)
+  const ch = D && D.nodes.changed.find((x) => x.id === m.id)
+  const touched = D ? D.commits.filter((c) => c.modules?.includes(m.id)) : []
+  const beadsTouching = D ? D.beads.filter((b) => touched.some((c) => c.sha === b.commit || c.subject.includes(b.id))) : []
+  let h = `<h3>${esc(m.id)}</h3><div class="k mono">${esc(m.path)} · ${esc(m.lang)} · ${m.lines} lines · fan-in ${m.fanIn ?? 0} · fan-out ${m.fanOut ?? 0}</div>`
+  h += `<div style="margin:6px 0"><a href="${vscode(r.rigPath, m.path)}">open in VS Code</a>${st ? ` <span class="pill ${st === 'measured' || st === 'text' ? 'changed' : st}">${st}</span>` : ''}${(m.flags || []).map((f) => `<span class="pill flag">${esc(f)}</span>`).join('')}</div>`
+  if (ch && Object.keys(ch.facets).length) {
+    h += '<h2>What shifted</h2><ul>'
+    for (const [k, v] of Object.entries(ch.facets)) h += k === 'metrics' ? `<li>${k}: grade ${v.before ?? 'none'} → ${v.after ?? 'none'}, coverage ${v.coverageBefore == null ? 'none' : v.coverageBefore.toFixed(0) + '%'} → ${v.coverageAfter == null ? 'none' : v.coverageAfter.toFixed(0) + '%'}</li>` : `<li>${k}: ${v.added.map((x) => `<span class="pill added">+${esc(x)}</span>`).join('')}${v.removed.map((x) => `<span class="pill removed">−${esc(x)}</span>`).join('')}</li>`
+    h += `</ul><div class="k">lines ${ch.lines.before} → ${ch.lines.after}${ch.commits?.length ? ' · commits ' + ch.commits.join(', ') : ''}</div>`
+  }
+  if (beadsTouching.length) h += `<h2>Beads that touched it</h2>${beadsTouching.map((b) => `<div class="bead"><div class="t">${esc(b.id)} ${esc(b.title)}</div></div>`).join('')}`
+  if (m.metrics) { const x = m.metrics; h += `<h2>Metrics</h2><table><tr><th>grade</th><td>${x.grade ?? 'none'}</td></tr>${x.coverage ? `<tr><th>coverage lines / branches</th><td>${x.coverage.lines.toFixed(1)}% / ${x.coverage.branches?.toFixed(1) ?? 'n/a'}%</td></tr>` : ''}${x.crap ? `<tr><th>CRAP max / cc max</th><td>${x.crap.max.toFixed(1)} / ${x.crap.ccMax} over ${x.crap.functions} functions${x.crap.over30.length ? '; over 30: ' + esc(x.crap.over30.join(', ')) : ''}</td></tr>` : ''}${x.mutation ? `<tr><th>mutation (${x.mutation.scope})</th><td>${x.mutation.killed}/${x.mutation.total} killed, ${x.mutation.survived} survived</td></tr>` : ''}</table>` }
+  h += `<h2>Members (${(m.members || []).length})</h2><ul>${(m.members || []).map((x) => `<li class="mono"><a href="${vscode(r.rigPath, m.path, x.line)}">${esc(x.name)}</a> <span class="k">${esc(x.kind || '')}${x.bases?.length ? ' : ' + esc(x.bases.join(', ')) : ''}${x.line ? ' L' + x.line : ''}</span></li>`).join('') || '<li class="k">none parsed</li>'}</ul>`
+  h += `<h2>Imports (${(m.imports || []).length})</h2><ul>${(m.imports || []).map((i) => `<li class="mono"><a href="#" data-go="${esc(i)}">${esc(i)}</a></li>`).join('') || '<li class="k">none</li>'}</ul>`
+  h += `<h2>Imported by (${importers.length})</h2><ul>${importers.map((i) => `<li class="mono"><a href="#" data-go="${esc(i)}">${esc(i)}</a></li>`).join('') || '<li class="k">none</li>'}</ul>`
+  if (m.foreign?.length) h += `<h2>Foreign</h2><div>${m.foreign.map((f) => `<span class="pill">${esc(f)}</span>`).join('')}</div>`
+  if (m.children?.length) h += `<h2>Renders</h2><div>${m.children.map((f) => `<span class="pill">${esc(f)}</span>`).join('')}</div>`
+  if (state.caps) { const owners = state.caps.layers.flatMap((l) => l.items.filter((i) => (i.modules || []).includes(m.id)).map((i) => `${l.title} / ${i.title}`)); h += `<h2>Capabilities</h2><div>${owners.map((o) => `<span class="pill">${esc(o)}</span>`).join('') || '<span class="k">not mapped to any capability</span>'}</div>` }
+  $('#detail').innerHTML = h
+  $('#detail').querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); state.sel = a.dataset.go; render() }))
+}
+function renderCaps() {
+  if (state.mode !== 'caps') return
+  const C = state.caps, S = state.snap
+  if (!C) { $('#caps').innerHTML = `<div class="empty">No capabilities/${esc(state.index.rigs[state.rigKey].rig)}.json yet. Author one: layers of user-facing capabilities, each listing the modules that implement it.</div>`; return }
+  const mapped = new Set(C.layers.flatMap((l) => l.items.flatMap((i) => i.modules || [])))
+  const unmapped = S.modules.filter((m) => m.role === 'source' && !mapped.has(m.id))
+  $('#caps').innerHTML = `<div class="cap-layer" style="border-style:dashed"><h4>${esc(C.title || C.rig)}</h4><div class="k">${esc(C.summary || '')} · status ${esc(C.status || 'draft')} · ${mapped.size} modules mapped, ${unmapped.length} source modules unmapped</div></div>` +
+    C.layers.map((l) => `<div class="cap-layer"><h4>${esc(l.title)}</h4><div class="k" style="margin-bottom:6px">${esc(l.description || '')}</div><div class="cap-items">${l.items.map((i) => `<div class="cap${state.capSel?.id === i.id ? ' sel' : ''}" data-cap="${esc(i.id)}"><div class="n">${esc(i.title)}</div><div class="c">${(i.modules || []).length} modules${i.status ? ' · ' + esc(i.status) : ''}</div></div>`).join('')}</div></div>`).join('') +
+    (unmapped.length ? `<div class="cap-layer"><h4>Unmapped source modules</h4><div class="cap-items">${unmapped.map((m) => `<span class="pill mono">${esc(m.id)}</span>`).join('')}</div></div>` : '')
+  $('#caps').querySelectorAll('[data-cap]').forEach((d) => d.addEventListener('click', () => { const item = C.layers.flatMap((l) => l.items).find((i) => i.id === d.dataset.cap); state.capSel = state.capSel?.id === item.id ? null : item; state.mode = 'model'; setMode(); render() }))
+}
+function setMode() { for (const m of ['model', 'wave', 'caps']) $(`#mode-${m}`).classList.toggle('on', state.mode === m) }
+// ---- controls ----
+$('#rig').addEventListener('change', async () => { state.rigKey = $('#rig').value; state.capSel = null; render.fitted = false; await loadRig() })
+$('#snap').addEventListener('change', loadSelection)
+$('#delta').addEventListener('change', loadSelection)
+for (const m of ['model', 'wave', 'caps']) $(`#mode-${m}`).addEventListener('click', async () => { state.mode = m; setMode(); if (m === 'wave') state.color = 'wave', setColor(); await loadSelection() })
+function setColor() { for (const c of ['wave', 'metrics', 'folder']) $(`#col-${c}`).classList.toggle('on', state.color === c) }
+for (const c of ['wave', 'metrics', 'folder']) $(`#col-${c}`).addEventListener('click', () => { state.color = c; setColor(); render() })
+$('#q').addEventListener('input', () => { state.q = $('#q').value; render() })
+$('#hide-tests').addEventListener('click', (e) => { state.hideTests = !state.hideTests; e.target.classList.toggle('on', state.hideTests); render() })
+$('#only-flagged').addEventListener('click', (e) => { state.onlyFlagged = !state.onlyFlagged; e.target.classList.toggle('on', state.onlyFlagged); render() })
+$('#only-changed').addEventListener('click', (e) => { state.onlyChanged = !state.onlyChanged; e.target.classList.toggle('on', state.onlyChanged); render() })
+// pan and zoom
+;(() => { const svg = $('#svg'); let drag = null
+  svg.addEventListener('mousedown', (e) => { if (e.target.closest('.node')) return; drag = { x: e.clientX - view.x, y: e.clientY - view.y }; svg.classList.add('panning') })
+  window.addEventListener('mousemove', (e) => { if (!drag) return; view.x = e.clientX - drag.x; view.y = e.clientY - drag.y; $('#root').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`) })
+  window.addEventListener('mouseup', () => { drag = null; svg.classList.remove('panning') })
+  svg.addEventListener('wheel', (e) => { e.preventDefault(); const f = e.deltaY < 0 ? 1.1 : 1 / 1.1; const box = svg.getBoundingClientRect(), mx = e.clientX - box.left, my = e.clientY - box.top; view.x = mx - (mx - view.x) * f; view.y = my - (my - view.y) * f; view.k *= f; $('#root').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`) }, { passive: false })
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { state.sel = null; state.capSel = null; render() } })
+})()
+init()
+</script>
+</body>
+</html>
