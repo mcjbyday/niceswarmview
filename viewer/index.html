@@ -11,6 +11,25 @@
 :root[data-theme="dark"] { --bg:#0f1a15; --panel:#15241d; --ink:#f0ece0; --muted:#9aa89f; --line:#2b3b33; --accent:#c9a24b; --gold:#c9a24b; --idle:#3a4a42; --nodata:#2f3d36; --hl:#c9a24b; }
 * { box-sizing:border-box }
 body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; display:grid; grid-template-columns:280px 1fr 360px; grid-template-rows:48px 1fr; height:100vh; }
+body.left-collapsed { grid-template-columns:0 1fr 360px } body.right-collapsed { grid-template-columns:280px 1fr 0 } body.left-collapsed.right-collapsed { grid-template-columns:0 1fr 0 }
+body.left-collapsed aside, body.right-collapsed #detail { padding:0; overflow:hidden; border:0 }
+.pane-btn { position:absolute; top:8px; z-index:5; width:28px; height:28px; padding:0; border-radius:6px; font-size:14px; line-height:1; background:var(--panel); }
+#btn-left { left:8px } #btn-right { right:8px }
+.toolbar { position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:5; display:flex; gap:6px; }
+.toolbar button { background:var(--panel) }
+#help { position:absolute; inset:0; z-index:20; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; padding:24px }
+#help .card { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:12px; max-width:720px; max-height:90%; overflow:auto; padding:18px 22px; }
+#help h3 { margin:0 0 8px } #help h2 { margin-top:14px } #help kbd { border:1px solid var(--line); border-radius:4px; padding:0 5px; font:12px ui-monospace,monospace; background:var(--bg) }
+#help ol li, #help ul li { margin:4px 0 }
+.diff { font:11.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:6px 8px; max-height:420px; background:var(--bg) }
+.diff .add { color:var(--added) } .diff .del { color:var(--removed) } .diff .hunk { color:var(--muted) } .diff .meta { color:var(--muted); font-weight:600 }
+.file-row { display:flex; gap:6px; align-items:center; font-size:12px; margin:2px 0; flex-wrap:wrap }
+.file-row .st { width:14px; font-weight:700 } .st.A { color:var(--added) } .st.D { color:var(--removed) } .st.M, .st.R { color:var(--changed) }
+.node .chk { font-size:12px; fill:#fff }
+.reviewed rect { stroke:var(--added) !important; stroke-width:2.5 }
+.wave-links a { margin-right:10px }
+.small { font-size:12px; color:var(--muted) }
+input[type=checkbox] { width:auto; margin-right:6px }
 header { grid-column:1/4; display:flex; align-items:center; gap:16px; padding:0 16px; border-bottom:1px solid var(--line); background:var(--panel); }
 header h1 { font-size:15px; margin:0; letter-spacing:.04em; text-transform:uppercase; color:var(--accent); }
 header .crumbs { color:var(--muted); font-size:13px; }
@@ -73,8 +92,34 @@ table { border-collapse:collapse; width:100%; font-size:12px } td, th { text-ali
   <div class="row" style="margin-top:6px"><button id="hide-tests" class="on">hide tests</button><button id="only-flagged">flagged only</button><button id="only-changed">changed only</button></div>
   <h2>Summary</h2><div id="summary" class="mono"></div>
   <h2>Beads in this wave</h2><div id="beads"></div>
+  <h2>Wave on GitHub</h2><div id="wave-links" class="wave-links small"></div>
+  <h2>Changed files</h2><div id="files"></div>
 </aside>
 <main id="stage">
+  <button class="pane-btn" id="btn-left" title="Collapse or expand the left pane ([)">◧</button>
+  <button class="pane-btn" id="btn-right" title="Collapse or expand the right pane (])">◨</button>
+  <div class="toolbar"><button id="btn-reset" title="Reset: clear selection, filters and zoom (r)">⌂ reset</button><button id="btn-next" title="Jump to the next unreviewed changed module (n)">next unreviewed</button><button id="btn-help" title="Help (h)">?</button></div>
+  <div id="help"><div class="card">
+    <h3>How to review a wave here</h3>
+    <ol>
+      <li>Pick the rig, then <b>Wave</b> and the delta (a bead id or a named wave).</li>
+      <li>Read the <b>shift notes</b> in the left pane beside the counts: what the worker says moved.</li>
+      <li>Open anything <b>flagged</b> (red outline) or <b>changed</b> (amber): the right pane lists what shifted, the beads that touched it, and the unified diff of its file.</li>
+      <li>Mark each module <b>reviewed</b> (checkbox in the right pane, or <kbd>v</kbd>); green outline on the node, count in the summary. <kbd>n</kbd> jumps to the next unreviewed changed module.</li>
+      <li>Double-click a node, or click a member, to land in the file in VS Code. <kbd>r</kbd> or the reset button brings you back to the whole picture.</li>
+    </ol>
+    <h2>Seeing the code change</h2>
+    <ul>
+      <li><b>In this page:</b> the right pane shows the unified diff for the selected module's file; the left pane lists every changed file in the wave with its diff.</li>
+      <li><b>On GitHub:</b> the wave panel links to <i>compare base...head</i> (the Files changed view, with its own "Viewed" checkboxes) and to any pull request that contains the head commit.</li>
+      <li><b>In VS Code, after landing in the file:</b> <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> opens Source Control; the <i>Timeline</i> view at the bottom of the Explorer lists the file's commits, click one to open its diff; or <kbd>F1</kbd> then <i>Git: Open Changes</i> for the working tree diff. The wave panel's "copy diff command" button puts <code>git diff base head -- file</code> on the clipboard for a terminal.</li>
+    </ul>
+    <h2>Keys</h2>
+    <ul><li><kbd>h</kbd> this help · <kbd>r</kbd> reset · <kbd>v</kbd> toggle reviewed · <kbd>n</kbd> next unreviewed · <kbd>[</kbd> <kbd>]</kbd> collapse panes · <kbd>Esc</kbd> close or deselect · wheel zooms, drag pans</li></ul>
+    <h2>Colors</h2>
+    <ul><li>Wave: green added, amber changed, red dashed removed, gray unchanged, red outline threshold flag. Metrics: red to green grade 1 to 10, gray no data. Rows: importers above, leaves below.</li></ul>
+    <div style="text-align:right;margin-top:10px"><button id="help-close">close</button></div>
+  </div></div>
   <svg id="svg"><g id="root"></g></svg>
   <div id="caps"></div>
   <div class="legend" id="legend"></div>
@@ -82,7 +127,15 @@ table { border-collapse:collapse; width:100%; font-size:12px } td, th { text-ali
 <section id="detail"><div class="empty">Select a module. Double-click opens it in VS Code.</div></section>
 <script>
 const $ = (s) => document.querySelector(s)
-const state = { index: null, rigKey: null, snap: null, delta: null, caps: null, mode: 'model', color: 'wave', q: '', hideTests: true, onlyFlagged: false, onlyChanged: false, sel: null, capSel: null }
+const state = { index: null, rigKey: null, snap: null, delta: null, caps: null, mode: 'model', color: 'wave', q: '', hideTests: true, onlyFlagged: false, onlyChanged: false, sel: null, capSel: null, fileSel: null }
+// Reviewed marks live per viewer, per rig and wave, in this browser only.
+const reviewedKey = () => `swarmview.reviewed.${state.rigKey}.${state.delta?.id || 'none'}`
+const reviewed = () => { try { return new Set(JSON.parse(localStorage.getItem(reviewedKey()) || '[]')) } catch { return new Set() } }
+const setReviewed = (id, on) => { const s = reviewed(); on ? s.add(id) : s.delete(id); try { localStorage.setItem(reviewedKey(), JSON.stringify([...s])) } catch {} }
+const clearReviewed = () => { try { localStorage.removeItem(reviewedKey()) } catch {} }
+const changedIds = () => state.delta ? [...state.delta.nodes.added.map((n) => n.id), ...state.delta.nodes.changed.map((n) => n.id), ...state.delta.nodes.renamed.map((n) => n.to)] : []
+const renderDiff = (patch) => patch ? patch.split('\n').map((l) => { const c = l.startsWith('+++') || l.startsWith('---') || l.startsWith('diff ') || l.startsWith('index ') ? 'meta' : l.startsWith('@@') ? 'hunk' : l.startsWith('+') ? 'add' : l.startsWith('-') ? 'del' : ''; return `<span class="${c}">${esc(l)}</span>` }).join('\n') : '<span class="k">no patch recorded</span>'
+const copyText = (s) => { try { navigator.clipboard.writeText(s) } catch {} }
 const DATA = '../local_data/'
 const fetchJson = async (u) => { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error(`${r.status} ${u}`); return r.json() }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
@@ -188,14 +241,16 @@ function render() {
     p.dataset.from = e.from; p.dataset.to = e.to
     g.appendChild(p)
   }
+  const rv = reviewed()
   for (const m of modules) {
     const p = L.pos.get(m.id), s = st.get(m.id)
-    const n = el('g', { class: `node${state.sel === m.id ? ' sel' : ''}${capMods && !capMods.has(m.id) ? ' dim' : ''}`, transform: `translate(${p.x},${p.y})` })
+    const n = el('g', { class: `node${state.sel === m.id ? ' sel' : ''}${capMods && !capMods.has(m.id) ? ' dim' : ''}${rv.has(m.id) ? ' reviewed' : ''}`, transform: `translate(${p.x},${p.y})` })
     const fill = fillFor(m, s)
     n.appendChild(el('rect', { width: p.w, height: p.h, fill, 'fill-opacity': state.color === 'wave' && !s ? .35 : .85, stroke: m.flags ? 'var(--flag)' : 'var(--line)', 'stroke-dasharray': m.removed ? '5 3' : '' }))
     const t1 = el('text', { x: 8, y: 18, fill: '#fff', 'font-weight': 600 }); t1.textContent = m.id.split('/').pop().slice(0, 20); n.appendChild(t1)
     const t2 = el('text', { x: 8, y: 34, fill: '#fff', 'fill-opacity': .85 }); t2.textContent = `${m.folder.split('/').slice(-2).join('/')} · ${m.lines ?? ''}${m.flags ? ' ⚑' : ''}${m.metrics?.grade ? ' g' + m.metrics.grade : ''}`; n.appendChild(t2)
-    n.addEventListener('click', () => { state.sel = m.id; render() })
+    if (rv.has(m.id)) { const c = el('text', { x: p.w - 16, y: 16, class: 'chk' }); c.textContent = '✓'; n.appendChild(c) }
+    n.addEventListener('click', () => { state.sel = m.id; state.fileSel = null; render() })
     n.addEventListener('dblclick', () => { window.location.href = vscode(r.rigPath, m.path, (m.members || [])[0]?.line) })
     g.appendChild(n)
   }
@@ -212,8 +267,28 @@ function renderSummary() {
   const S = state.snap, D = state.delta, c = S.counts
   let h = `modules ${c.modules} (tests ${c.tests}) · edges ${c.edges}<br>flagged ${c.flagged} · with metrics ${c.withMetrics}`
   if (S.metricsNote?.source) h += `<br>metrics from ${esc(S.metricsNote.source)}`
-  if (state.mode === 'wave' && D) h += `<hr>wave ${esc(D.id)}<br>${short(D.base.sha)} → ${short(D.head.sha)}<br>+${D.counts.added} added · −${D.counts.removed} removed<br>~${D.counts.changed} changed (${D.counts.structural} structural)<br>edges +${D.counts.edgesAdded} −${D.counts.edgesRemoved}<br>commits ${D.counts.commits} · flags raised ${D.counts.flagsRaised}`
+  if (state.mode === 'wave' && D) { const ids = changedIds(), rv = reviewed(), done = ids.filter((i) => rv.has(i)).length; h += `<hr>wave ${esc(D.id)}<br>${short(D.base.sha)} → ${short(D.head.sha)}<br>+${D.counts.added} added · −${D.counts.removed} removed<br>~${D.counts.changed} changed (${D.counts.structural} structural)<br>edges +${D.counts.edgesAdded} −${D.counts.edgesRemoved}<br>commits ${D.counts.commits} · flags raised ${D.counts.flagsRaised}<br><b>reviewed ${done} / ${ids.length}</b> <a href="#" id="clear-rv">clear</a>` }
   $('#summary').innerHTML = h
+  const cr = $('#clear-rv'); if (cr) cr.addEventListener('click', (e) => { e.preventDefault(); clearReviewed(); render() })
+  renderWaveLinks(); renderFiles()
+}
+function renderWaveLinks() {
+  const D = state.delta, r = state.index.rigs[state.rigKey]
+  if (!D || state.mode !== 'wave') { $('#wave-links').innerHTML = '<span class="k">pick a wave</span>'; return }
+  let h = D.compareUrl ? `<a href="${esc(D.compareUrl)}" target="_blank" rel="noreferrer">compare on GitHub (files changed)</a>` : '<span class="k">no remote recorded</span>'
+  if (D.pulls?.length) h += D.pulls.map((p) => `<a href="${esc(p.html_url)}" target="_blank" rel="noreferrer">PR #${p.number} ${esc(p.title)} (${esc(p.state)})</a>`).join('')
+  else h += '<span class="k">no pull request contains the head commit</span>'
+  h += `<div style="margin-top:4px"><button id="copy-diff" style="font-size:11px;padding:2px 8px">copy diff command</button> <span class="k mono">git -C ${esc(r.rigPath)} diff ${short(D.base.sha)} ${short(D.head.sha)}</span></div>`
+  $('#wave-links').innerHTML = h
+  $('#copy-diff').addEventListener('click', () => copyText(`git -C ${r.rigPath} diff ${D.base.sha} ${D.head.sha}`))
+}
+function renderFiles() {
+  const D = state.delta, r = state.index.rigs[state.rigKey]
+  if (!D || state.mode !== 'wave') { $('#files').innerHTML = '<span class="k">pick a wave</span>'; return }
+  const rv = reviewed()
+  $('#files').innerHTML = (D.changedFiles || []).map((f) => `<div class="file-row"><span class="st ${f.status}">${f.status}</span><a href="#" data-file="${esc(f.path)}" class="mono">${esc(f.path)}</a>${f.module && rv.has(f.module) ? '<span class="pill added">✓</span>' : ''}${f.module ? `<a href="#" data-go="${esc(f.module)}" class="small">module</a>` : ''}<a class="small" href="${vscode(r.rigPath, f.path)}">vscode</a></div>`).join('') || '<span class="k">no files</span>'
+  $('#files').querySelectorAll('[data-file]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); state.fileSel = a.dataset.file; const f = D.changedFiles.find((x) => x.path === state.fileSel); if (f?.module) state.sel = f.module; render() }))
+  $('#files').querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); state.sel = a.dataset.go; state.fileSel = null; render() }))
 }
 function renderBeads() {
   const D = state.delta, r = state.index.rigs[state.rigKey]
@@ -223,13 +298,16 @@ function renderBeads() {
 function renderDetail() {
   const S = state.snap, D = state.delta, r = state.index.rigs[state.rigKey]
   const m = S.modules.find((x) => x.id === state.sel) || (D && D.nodes.removed.find((x) => x.id === state.sel))
-  if (!m) { $('#detail').innerHTML = '<div class="empty">Select a module. Double-click opens it in VS Code.</div>'; return }
+  if (!m && state.fileSel && D) { const f = D.changedFiles.find((x) => x.path === state.fileSel); $('#detail').innerHTML = f ? `<h3>${esc(f.path)}</h3><div class="k">${f.status} · not a scanned module · <a href="${vscode(r.rigPath, f.path)}">open in VS Code</a></div><h2>Diff</h2><div class="diff">${renderDiff(f.patch)}</div>${f.truncated ? '<div class="small">patch truncated; use the GitHub compare link</div>' : ''}` : ''; return }
+  if (!m) { $('#detail').innerHTML = '<div class="empty">Select a module. Double-click opens it in VS Code. Press h for help.</div>'; return }
   const st = statusMap().get(m.id)
   const importers = S.edges.filter((e) => e.to === m.id).map((e) => e.from)
   const ch = D && D.nodes.changed.find((x) => x.id === m.id)
   const touched = D ? D.commits.filter((c) => c.modules?.includes(m.id)) : []
   const beadsTouching = D ? D.beads.filter((b) => touched.some((c) => c.sha === b.commit || c.subject.includes(b.id))) : []
+  const isChanged = changedIds().includes(m.id), rv = reviewed()
   let h = `<h3>${esc(m.id)}</h3><div class="k mono">${esc(m.path)} · ${esc(m.lang)} · ${m.lines} lines · fan-in ${m.fanIn ?? 0} · fan-out ${m.fanOut ?? 0}</div>`
+  if (D && state.mode === 'wave' && isChanged) h += `<label style="display:block;margin:6px 0"><input type="checkbox" id="rv-toggle" ${rv.has(m.id) ? 'checked' : ''}>reviewed</label>`
   h += `<div style="margin:6px 0"><a href="${vscode(r.rigPath, m.path)}">open in VS Code</a>${st ? ` <span class="pill ${st === 'measured' || st === 'text' ? 'changed' : st}">${st}</span>` : ''}${(m.flags || []).map((f) => `<span class="pill flag">${esc(f)}</span>`).join('')}</div>`
   if (ch && Object.keys(ch.facets).length) {
     h += '<h2>What shifted</h2><ul>'
@@ -237,6 +315,7 @@ function renderDetail() {
     h += `</ul><div class="k">lines ${ch.lines.before} → ${ch.lines.after}${ch.commits?.length ? ' · commits ' + ch.commits.join(', ') : ''}</div>`
   }
   if (beadsTouching.length) h += `<h2>Beads that touched it</h2>${beadsTouching.map((b) => `<div class="bead"><div class="t">${esc(b.id)} ${esc(b.title)}</div></div>`).join('')}`
+  if (D && state.mode === 'wave') { const files = (D.changedFiles || []).filter((f) => f.module === m.id || f.path === state.fileSel); for (const f of files) h += `<h2>Diff: ${esc(f.path)} (${f.status})</h2><div class="diff">${renderDiff(f.patch)}</div>${f.truncated ? '<div class="small">patch truncated; use the GitHub compare link</div>' : ''}` }
   if (m.metrics) { const x = m.metrics; h += `<h2>Metrics</h2><table><tr><th>grade</th><td>${x.grade ?? 'none'}</td></tr>${x.coverage ? `<tr><th>coverage lines / branches</th><td>${x.coverage.lines.toFixed(1)}% / ${x.coverage.branches?.toFixed(1) ?? 'n/a'}%</td></tr>` : ''}${x.crap ? `<tr><th>CRAP max / cc max</th><td>${x.crap.max.toFixed(1)} / ${x.crap.ccMax} over ${x.crap.functions} functions${x.crap.over30.length ? '; over 30: ' + esc(x.crap.over30.join(', ')) : ''}</td></tr>` : ''}${x.mutation ? `<tr><th>mutation (${x.mutation.scope})</th><td>${x.mutation.killed}/${x.mutation.total} killed, ${x.mutation.survived} survived</td></tr>` : ''}</table>` }
   h += `<h2>Members (${(m.members || []).length})</h2><ul>${(m.members || []).map((x) => `<li class="mono"><a href="${vscode(r.rigPath, m.path, x.line)}">${esc(x.name)}</a> <span class="k">${esc(x.kind || '')}${x.bases?.length ? ' : ' + esc(x.bases.join(', ')) : ''}${x.line ? ' L' + x.line : ''}</span></li>`).join('') || '<li class="k">none parsed</li>'}</ul>`
   h += `<h2>Imports (${(m.imports || []).length})</h2><ul>${(m.imports || []).map((i) => `<li class="mono"><a href="#" data-go="${esc(i)}">${esc(i)}</a></li>`).join('') || '<li class="k">none</li>'}</ul>`
@@ -245,8 +324,12 @@ function renderDetail() {
   if (m.children?.length) h += `<h2>Renders</h2><div>${m.children.map((f) => `<span class="pill">${esc(f)}</span>`).join('')}</div>`
   if (state.caps) { const owners = state.caps.layers.flatMap((l) => l.items.filter((i) => (i.modules || []).includes(m.id)).map((i) => `${l.title} / ${i.title}`)); h += `<h2>Capabilities</h2><div>${owners.map((o) => `<span class="pill">${esc(o)}</span>`).join('') || '<span class="k">not mapped to any capability</span>'}</div>` }
   $('#detail').innerHTML = h
-  $('#detail').querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); state.sel = a.dataset.go; render() }))
+  $('#detail').querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); state.sel = a.dataset.go; state.fileSel = null; render() }))
+  const tg = $('#rv-toggle'); if (tg) tg.addEventListener('change', () => { setReviewed(m.id, tg.checked); render() })
 }
+function resetAll() { state.sel = null; state.capSel = null; state.fileSel = null; state.q = ''; $('#q').value = ''; state.onlyFlagged = false; state.onlyChanged = false; $('#only-flagged').classList.remove('on'); $('#only-changed').classList.remove('on'); render.fitted = false; render() }
+function nextUnreviewed() { const ids = changedIds(), rv = reviewed(); const todo = ids.filter((i) => !rv.has(i) && state.snap.modules.some((m) => m.id === i)); if (!todo.length) return; const i = Math.max(0, todo.indexOf(state.sel)); state.sel = todo[(i + (todo[i] === state.sel ? 1 : 0)) % todo.length]; state.fileSel = null; render() }
+function togglePane(side) { document.body.classList.toggle(`${side}-collapsed`); render.fitted = false; render() }
 function renderCaps() {
   if (state.mode !== 'caps') return
   const C = state.caps, S = state.snap
@@ -276,8 +359,24 @@ $('#only-changed').addEventListener('click', (e) => { state.onlyChanged = !state
   window.addEventListener('mousemove', (e) => { if (!drag) return; view.x = e.clientX - drag.x; view.y = e.clientY - drag.y; $('#root').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`) })
   window.addEventListener('mouseup', () => { drag = null; svg.classList.remove('panning') })
   svg.addEventListener('wheel', (e) => { e.preventDefault(); const f = e.deltaY < 0 ? 1.1 : 1 / 1.1; const box = svg.getBoundingClientRect(), mx = e.clientX - box.left, my = e.clientY - box.top; view.x = mx - (mx - view.x) * f; view.y = my - (my - view.y) * f; view.k *= f; $('#root').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`) }, { passive: false })
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { state.sel = null; state.capSel = null; render() } })
+  window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return
+    if (e.key === 'Escape') { if ($('#help').style.display === 'flex') $('#help').style.display = 'none'; else { state.sel = null; state.capSel = null; state.fileSel = null; render() } }
+    else if (e.key === 'h') $('#help').style.display = $('#help').style.display === 'flex' ? 'none' : 'flex'
+    else if (e.key === 'r') resetAll()
+    else if (e.key === 'v' && state.sel && changedIds().includes(state.sel)) { setReviewed(state.sel, !reviewed().has(state.sel)); render() }
+    else if (e.key === 'n') nextUnreviewed()
+    else if (e.key === '[') togglePane('left')
+    else if (e.key === ']') togglePane('right')
+  })
 })()
+$('#btn-left').addEventListener('click', () => togglePane('left'))
+$('#btn-right').addEventListener('click', () => togglePane('right'))
+$('#btn-reset').addEventListener('click', resetAll)
+$('#btn-next').addEventListener('click', nextUnreviewed)
+$('#btn-help').addEventListener('click', () => { $('#help').style.display = 'flex' })
+$('#help-close').addEventListener('click', () => { $('#help').style.display = 'none' })
+$('#help').addEventListener('click', (e) => { if (e.target.id === 'help') $('#help').style.display = 'none' })
 init()
 </script>
 </body>

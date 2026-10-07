@@ -110,7 +110,10 @@ for (const m of modules) {
 
 fs.rmSync(tmp, { recursive: true, force: true })
 const meta = git(rig, 'log', '-1', '--format=%H%n%an%n%aI%n%s', commit).trim().split('\n')
-const snapshot = { city, rig: name, rigPath: rig, ref, sha: commit, author: meta[1], date: meta[2], subject: meta[3],
+// Remote as an https URL, for GitHub compare and commit links in the viewer.
+let remote = null
+try { remote = git(rig, 'remote', 'get-url', 'origin').trim().replace(/^git@github\.com:/, 'https://github.com/').replace(/\.git$/, '') } catch {}
+const snapshot = { city, rig: name, rigPath: rig, remote, ref, sha: commit, author: meta[1], date: meta[2], subject: meta[3],
   generated: new Date().toISOString(), thresholds: T, metricsNote,
   counts: { modules: modules.length, source: modules.filter((m) => m.role === 'source').length, tests: modules.filter((m) => m.role === 'test').length, edges: edges.length, flagged: modules.filter((m) => m.flags).length, withMetrics: modules.filter((m) => m.metrics).length },
   modules: modules.sort((a, b) => a.id.localeCompare(b.id)), edges }
@@ -119,6 +122,7 @@ writeJson(out, snapshot)
 updateIndex((idx) => {
   const r = (idx.rigs[`${city}/${name}`] ||= { city, rig: name, rigPath: rig, snapshots: {}, deltas: {} })
   r.rigPath = rig
+  r.remote = remote
   r.snapshots[commit] = { sha: commit, ref, date: meta[2], subject: meta[3], counts: snapshot.counts }
 })
 console.log(`${city}/${name} ${commit.slice(0, 7)} ${ref}: ${snapshot.counts.modules} modules (${snapshot.counts.tests} tests), ${snapshot.counts.edges} edges, ${snapshot.counts.withMetrics} with metrics, ${snapshot.counts.flagged} flagged -> ${path.relative(REPO, out)}`)

@@ -38,9 +38,34 @@ const commits = git(rig, 'log', '--format=%H%x09%h%x09%an%x09%aI%x09%s', `${base
 const inRange = new Set(commits.map((c) => c.sha))
 // Modules each commit touched, so the viewer can say which bead touched a node.
 for (const c of commits) {
-  const files = git(rig, 'show', '--format=', '--name-only', c.sha).trim().split('\n').filter(Boolean)
+  const rows = git(rig, 'show', '--format=', '--name-status', '-M', c.sha).trim().split('\n').filter(Boolean).map((l) => { const [st, a, b] = l.split('\t'); return { status: st[0], path: b || a, from: b ? a : null } })
+  c.files = rows
+  const files = rows.map((r) => r.path)
   c.modules = files.map((f) => f.replace(/\.[^.]+$/, '')).filter((m) => bm.has(m) || am.has(m))
 }
+// Every file the wave changed, base..head, with its unified diff embedded so
+// the viewer can show code-level changes without leaving the page. Each
+// patch is capped; the GitHub compare link covers the rest.
+const PATCH_CAP = 24000
+const changedFiles = git(rig, 'diff', '--name-status', '-M', baseSha, headSha).trim().split('\n').filter(Boolean).map((l) => {
+  const [st, a, b] = l.split('\t'); const file = b || a
+  let patch = ''
+  try { patch = git(rig, 'diff', '--no-color', '-M', baseSha, headSha, '--', file) } catch {}
+  const binary = /^Binary files/m.test(patch)
+  return { status: st[0], path: file, from: b ? a : null, module: bm.has(file.replace(/\.[^.]+$/, '')) || am.has(file.replace(/\.[^.]+$/, '')) ? file.replace(/\.[^.]+$/, '') : null,
+    binary, truncated: patch.length > PATCH_CAP, patch: binary ? '' : patch.slice(0, PATCH_CAP) }
+})
+// GitHub pull requests that contain the head commit, best effort through gh.
+let remote = B.remote || A.remote || null
+let pulls = []
+if (remote && /github\.com\//.test(remote)) {
+  try {
+    const repo = remote.replace(/^https:\/\/github\.com\//, '')
+    const out = execFileSync('gh', ['api', `repos/${repo}/commits/${headSha}/pulls`, '--jq', '.[] | {number, title, html_url, state}'], { encoding: 'utf8', timeout: 15000 })
+    pulls = out.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l))
+  } catch {}
+}
+const compareUrl = remote ? `${remote}/compare/${baseSha}...${headSha}` : null
 // Bead ids named in commit subjects, e.g. "feat: ... (ab-123)", join even when
 // the recorded work commit differs (rebased or squashed before merge).
 const idsInSubjects = new Set(commits.flatMap((c) => [...c.subject.matchAll(/\b([a-z]{2,3}-[a-z0-9]{3,})\b/g)].map((m) => m[1])))
@@ -80,7 +105,7 @@ const beadRows = beads(rig).filter((b) => inRange.has(b.metadata?.['gc.work_comm
     verification: b.metadata?.['gc.work_verification'] || null, outcome: b.metadata?.['gc.work_outcome'] || null, shiftNote: shiftNote(b.notes), design: b.metadata?.design || null }))
 
 const id = args.id || `${baseSha.slice(0, 7)}..${headSha.slice(0, 7)}`
-const delta = { city, rig: name, rigPath: rig, id, base: { ref: args.base, sha: baseSha, date: A.date }, head: { ref: args.head, sha: headSha, date: B.date }, generated: new Date().toISOString(),
+const delta = { city, rig: name, rigPath: rig, remote, compareUrl, pulls, changedFiles, id, base: { ref: args.base, sha: baseSha, date: A.date }, head: { ref: args.head, sha: headSha, date: B.date }, generated: new Date().toISOString(),
   counts: { added: nodes.added.length, removed: nodes.removed.length, renamed: renamed.length, changed: nodes.changed.length, structural: nodes.changed.filter((c) => c.structural).length, edgesAdded: edges.added.length, edgesRemoved: edges.removed.length, commits: commits.length, beads: beadRows.length,
     flagsRaised: nodes.changed.flatMap((c) => c.facets.flags?.added || []).length + nodes.added.flatMap((n) => n.flags).length },
   labels: [...new Set(beadRows.flatMap((b) => b.labels))], nodes, edges, commits, beads: beadRows }
