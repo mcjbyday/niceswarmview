@@ -90,8 +90,11 @@ if (qdirs.length) {
     }
   }
 }
-// JS rigs: istanbul summary if present
-const istanbul = readJson(path.join(tmp, 'coverage/coverage-summary.json'), null)
+// JS rigs: istanbul summary if present, either at coverage/ (c8 default) or
+// committed under quality/<pass>/ next to crap.json (example, 2026-10-14).
+const qsum = all.filter((f) => /^quality\/[^/]+\/coverage-summary\.json$/.test(f)).sort()
+const istanbul = readJson(path.join(tmp, 'coverage/coverage-summary.json'), null) || (qsum.length ? readJson(path.join(tmp, qsum[qsum.length - 1]), null) : null)
+if (istanbul && qsum.length && !metricsNote.source) metricsNote.source = path.dirname(qsum[qsum.length - 1])
 if (istanbul) for (const m of modules) {
   const k = Object.keys(istanbul).find((p) => p.endsWith('/' + m.path))
   if (k) m.metrics = { coverage: { lines: istanbul[k].lines.pct, branches: istanbul[k].branches.pct }, grade: Math.max(1, Math.round(istanbul[k].lines.pct / 10)) }
