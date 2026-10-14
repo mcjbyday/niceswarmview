@@ -50,13 +50,22 @@ svg.panning { cursor:grabbing }
 .node rect { stroke-width:1.5; rx:6; }
 .node text { font-size:11px; pointer-events:none; }
 .node.sel rect { stroke:var(--hl); stroke-width:3; }
+.node.groupsel rect { stroke:var(--gold); stroke-width:3; stroke-dasharray:4 2; }
 .node.dim { opacity:.25 }
 .edge { fill:none; stroke:var(--muted); stroke-opacity:.45; stroke-width:1; }
 .edge.added { stroke:var(--added); stroke-opacity:.9; stroke-width:1.6 }
 .edge.removed { stroke:var(--removed); stroke-dasharray:4 3; stroke-opacity:.9 }
 .edge.inheritance { stroke-dasharray:1 0; stroke-width:1.8 }
 .rank-label { font-size:10px; fill:var(--muted); text-transform:uppercase; letter-spacing:.08em }
-.legend { position:absolute; left:12px; bottom:12px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:11px; display:flex; gap:12px; flex-wrap:wrap; max-width:70%; }
+.legend { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:11px; display:flex; gap:12px; flex-wrap:wrap; max-width:70%; }
+#corner-bl { position:absolute; left:12px; bottom:12px; z-index:6; display:flex; flex-direction:column-reverse; gap:8px; align-items:flex-start; }
+#lasso { position:absolute; display:none; border:1.5px dashed var(--hl); background:rgba(184,144,47,.12); pointer-events:none; z-index:8; }
+#selmenu { position:absolute; display:none; z-index:9; background:var(--panel); border:1px solid var(--line); border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,.25); padding:4px; }
+#selmenu button { font-size:12px; padding:3px 10px; width:auto; }
+.minbar button#btn-minbar-toggle { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:12px; width:auto; }
+#min-stack { display:none; margin-top:6px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 8px; max-height:260px; overflow:auto; min-width:200px; }
+.min-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:3px 2px; font-size:12px; }
+.min-row button { width:auto; padding:1px 8px; font-size:13px; line-height:1; }
 .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
 h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:16px 0 6px; }
 h3 { font-size:14px; margin:4px 0; word-break:break-all }
@@ -118,20 +127,35 @@ table { border-collapse:collapse; width:100%; font-size:12px } td, th { text-ali
       <li><b>On GitHub:</b> the wave panel links to <i>compare base...head</i> (the Files changed view, with its own "Viewed" checkboxes) and to any pull request that contains the head commit.</li>
       <li><b>In VS Code, after landing in the file:</b> <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> opens Source Control; the <i>Timeline</i> view at the bottom of the Explorer lists the file's commits, click one to open its diff; or <kbd>F1</kbd> then <i>Git: Open Changes</i> for the working tree diff. The wave panel's "copy diff command" button puts <code>git diff base head -- file</code> on the clipboard for a terminal.</li>
     </ul>
+    <h2>Gestures and multi-select</h2>
+    <ul>
+      <li><b>Pan:</b> a two-finger swipe on a trackpad pans the stage; drag with the mouse (left button) also pans.</li>
+      <li><b>Zoom:</b> pinch together to zoom out, spread apart to zoom in on a trackpad; with a mouse, hold <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> and scroll.</li>
+      <li><b>Select a group:</b> right-click and drag to draw a dashed box over the nodes you want; hold <kbd>Shift</kbd> while right-clicking (drag or a single click) to add more to the group; right-click a node already in the group (no drag) to drop just that one.</li>
+      <li><b>Minimize:</b> letting go of the right-click opens a small menu by the cursor; <b>Minimize</b> sends the selected nodes to a tray at the bottom left. Click the tray to expand the list of names; the <kbd>&uarr;</kbd> beside a name restores that one node to the diagram.</li>
+    </ul>
     <h2>Keys</h2>
-    <ul><li><kbd>h</kbd> this help · <kbd>r</kbd> reset · <kbd>v</kbd> toggle reviewed · <kbd>n</kbd> next unreviewed · <kbd>[</kbd> <kbd>]</kbd> collapse panes · <kbd>Esc</kbd> close or deselect · wheel zooms, drag pans</li></ul>
+    <ul><li><kbd>h</kbd> this help · <kbd>r</kbd> reset · <kbd>v</kbd> toggle reviewed · <kbd>n</kbd> next unreviewed · <kbd>[</kbd> <kbd>]</kbd> collapse panes · <kbd>Esc</kbd> close menus or deselect</li></ul>
     <h2>Colors</h2>
     <ul><li>Wave: green added, amber changed, red dashed removed, gray unchanged, red outline threshold flag. Metrics: red to green grade 1 to 10, gray no data. Rows: importers above, leaves below.</li></ul>
     <div style="text-align:right;margin-top:10px"><button id="help-close">close</button></div>
   </div></div>
   <svg id="svg"><g id="root"></g></svg>
   <div id="caps"></div>
-  <div class="legend" id="legend"></div>
+  <div id="lasso"></div>
+  <div id="selmenu"><button id="btn-minimize">Minimize</button></div>
+  <div id="corner-bl">
+    <div class="legend" id="legend"></div>
+    <div class="minbar" id="minbar" style="display:none">
+      <button id="btn-minbar-toggle">Minimized (<span id="min-count">0</span>)</button>
+      <div id="min-stack"></div>
+    </div>
+  </div>
 </main>
 <section id="detail"><div class="empty">Select a module. Double-click opens it in VS Code.</div></section>
 <script>
 const $ = (s) => document.querySelector(s)
-const state = { index: null, rigKey: null, snap: null, delta: null, caps: null, mode: 'model', color: 'wave', q: '', hideTests: true, onlyFlagged: false, onlyChanged: false, sel: null, capSel: null, fileSel: null }
+const state = { index: null, rigKey: null, snap: null, delta: null, caps: null, mode: 'model', color: 'wave', q: '', hideTests: true, onlyFlagged: false, onlyChanged: false, sel: null, capSel: null, fileSel: null, groupSel: new Set(), minimized: [] }
 // Reviewed marks live per viewer, per rig and wave, in this browser only.
 const reviewedKey = () => `swarmview.reviewed.${state.rigKey}.${state.delta?.id || 'none'}`
 const reviewed = () => { try { return new Set(JSON.parse(localStorage.getItem(reviewedKey()) || '[]')) } catch { return new Set() } }
@@ -240,6 +264,7 @@ function layout(modules, edges) {
 }
 
 let view = { x: 20, y: 20, k: 1 }
+let lastLayout = null
 function render() {
   const S = state.snap, st = statusMap(), r = state.index.rigs[state.rigKey]
   $('#crumbs').textContent = `${state.rigKey} · ${short(S.sha)} ${S.ref} · ${S.subject}`
@@ -250,11 +275,13 @@ function render() {
   let modules = [...S.modules, ...removedNodes]
   const q = state.q.toLowerCase()
   const capMods = state.capSel ? new Set(state.capSel.modules || []) : null
-  modules = modules.filter((m) => (!state.hideTests || m.role !== 'test') && (!state.onlyFlagged || m.flags) && (!state.onlyChanged || st.has(m.id)) && (!q || m.id.toLowerCase().includes(q) || (m.members || []).some((x) => x.name.toLowerCase().includes(q))))
+  const minSet = new Set(state.minimized)
+  modules = modules.filter((m) => (!state.hideTests || m.role !== 'test') && (!state.onlyFlagged || m.flags) && (!state.onlyChanged || st.has(m.id)) && (!q || m.id.toLowerCase().includes(q) || (m.members || []).some((x) => x.name.toLowerCase().includes(q))) && !minSet.has(m.id))
   const ids = new Set(modules.map((m) => m.id))
   const edgeList = [...S.edges.map((e) => ({ ...e, status: state.delta && state.delta.edges.added.includes(`${e.from} -> ${e.to}`) ? 'added' : '' }))]
   if (state.mode === 'wave' && state.delta) for (const e of state.delta.edges.removed) { const [from, to] = e.split(' -> '); edgeList.push({ from, to, kind: 'dependency', status: 'removed' }) }
   const L = layout(modules, edgeList)
+  lastLayout = L
   const g = $('#root'); g.innerHTML = ''
   const ns = 'http://www.w3.org/2000/svg', el = (t, a = {}) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); return e }
   for (const e of edgeList) {
@@ -268,7 +295,8 @@ function render() {
   const rv = reviewed()
   for (const m of modules) {
     const p = L.pos.get(m.id), s = st.get(m.id)
-    const n = el('g', { class: `node${state.sel === m.id ? ' sel' : ''}${capMods && !capMods.has(m.id) ? ' dim' : ''}${rv.has(m.id) ? ' reviewed' : ''}`, transform: `translate(${p.x},${p.y})` })
+    const n = el('g', { class: `node${state.sel === m.id ? ' sel' : ''}${capMods && !capMods.has(m.id) ? ' dim' : ''}${rv.has(m.id) ? ' reviewed' : ''}${state.groupSel.has(m.id) ? ' groupsel' : ''}`, transform: `translate(${p.x},${p.y})` })
+    n.__nodeId = m.id
     const fill = fillFor(m, s)
     n.appendChild(el('rect', { width: p.w, height: p.h, fill, 'fill-opacity': state.color === 'wave' && !s ? .35 : .85, stroke: m.flags ? 'var(--flag)' : 'var(--line)', 'stroke-dasharray': m.removed ? '5 3' : '' }))
     const t1 = el('text', { x: 8, y: 18, fill: '#fff', 'font-weight': 600 }); t1.textContent = m.id.split('/').pop().slice(0, 20); n.appendChild(t1)
@@ -285,7 +313,16 @@ function render() {
     ? `<span><i class="sw" style="background:var(--added)"></i>added</span><span><i class="sw" style="background:var(--changed)"></i>changed</span><span><i class="sw" style="background:var(--removed)"></i>removed (dashed)</span><span><i class="sw" style="background:var(--idle)"></i>unchanged</span><span><i class="sw" style="border:2px solid var(--flag)"></i>threshold flag</span><span>rows: importers above, leaves below</span>`
     : state.color === 'metrics' ? `<span><i class="sw" style="background:${gradeColor(1)}"></i>grade 1</span><span><i class="sw" style="background:${gradeColor(5)}"></i>5</span><span><i class="sw" style="background:${gradeColor(10)}"></i>10</span><span><i class="sw" style="background:var(--nodata)"></i>no data</span><span>grade = mean(coverage, mutation kill rate), capped at 5 with any CRAP over 30</span>`
     : [...new Set(modules.map((m) => m.folder))].sort().map((f) => `<span><i class="sw" style="background:${folderColor(f)}"></i>${esc(f)}</span>`).join('')
-  renderSummary(); renderBeads(); renderDetail(); renderCaps()
+  renderSummary(); renderBeads(); renderDetail(); renderCaps(); renderMinbar()
+}
+// ---- minimize tray: a stack of nodes pulled off the diagram, bottom left ----
+function renderMinbar() {
+  const bar = $('#minbar'), count = $('#min-count'), stack = $('#min-stack')
+  if (!state.minimized.length) { bar.style.display = 'none'; return }
+  bar.style.display = 'block'
+  count.textContent = state.minimized.length
+  stack.innerHTML = state.minimized.map((id) => `<div class="min-row"><span class="mono">${esc(id.split('/').pop())}</span><button data-restore="${esc(id)}" title="Restore ${esc(id)} to the diagram">&uarr;</button></div>`).join('')
+  stack.querySelectorAll('[data-restore]').forEach((b) => b.addEventListener('click', () => { state.minimized = state.minimized.filter((x) => x !== b.dataset.restore); render() }))
 }
 function renderSummary() {
   const S = state.snap, D = state.delta, c = S.counts
@@ -380,13 +417,29 @@ $('#only-flagged').addEventListener('click', (e) => { state.onlyFlagged = !state
 $('#only-changed').addEventListener('click', (e) => { state.onlyChanged = !state.onlyChanged; e.target.classList.toggle('on', state.onlyChanged); render() })
 // pan and zoom
 ;(() => { const svg = $('#svg'); let drag = null
-  svg.addEventListener('mousedown', (e) => { if (e.target.closest('.node')) return; drag = { x: e.clientX - view.x, y: e.clientY - view.y }; svg.classList.add('panning') })
-  window.addEventListener('mousemove', (e) => { if (!drag) return; view.x = e.clientX - drag.x; view.y = e.clientY - drag.y; $('#root').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`) })
+  const applyTransform = () => $('#root').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`)
+  svg.addEventListener('mousedown', (e) => { if (e.button !== 0 || e.target.closest('.node')) return; drag = { x: e.clientX - view.x, y: e.clientY - view.y }; svg.classList.add('panning') })
+  window.addEventListener('mousemove', (e) => { if (!drag) return; view.x = e.clientX - drag.x; view.y = e.clientY - drag.y; applyTransform() })
   window.addEventListener('mouseup', () => { drag = null; svg.classList.remove('panning') })
-  svg.addEventListener('wheel', (e) => { e.preventDefault(); const f = e.deltaY < 0 ? 1.1 : 1 / 1.1; const box = svg.getBoundingClientRect(), mx = e.clientX - box.left, my = e.clientY - box.top; view.x = mx - (mx - view.x) * f; view.y = my - (my - view.y) * f; view.k *= f; $('#root').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`) }, { passive: false })
+  // Trackpad gestures land here as wheel events: a plain two-finger swipe
+  // carries deltaX/deltaY with no modifier and pans; the browser marks a
+  // pinch with ctrlKey, where deltaY<0 is fingers spreading (zoom in) and
+  // deltaY>0 is fingers pinching together (zoom out) - Ctrl/Cmd+wheel on a
+  // plain mouse reaches the same branch.
+  svg.addEventListener('wheel', (e) => {
+    e.preventDefault()
+    if (e.ctrlKey) {
+      const f = e.deltaY < 0 ? 1.1 : 1 / 1.1
+      const box = svg.getBoundingClientRect(), mx = e.clientX - box.left, my = e.clientY - box.top
+      view.x = mx - (mx - view.x) * f; view.y = my - (my - view.y) * f; view.k *= f
+    } else {
+      view.x -= e.deltaX; view.y -= e.deltaY
+    }
+    applyTransform()
+  }, { passive: false })
   window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return
-    if (e.key === 'Escape') { if ($('#help').style.display === 'flex') $('#help').style.display = 'none'; else { state.sel = null; state.capSel = null; state.fileSel = null; render() } }
+    if (e.key === 'Escape') { if ($('#help').style.display === 'flex') $('#help').style.display = 'none'; else if ($('#selmenu').style.display === 'block') { $('#selmenu').style.display = 'none'; state.groupSel.clear(); render() } else { state.sel = null; state.capSel = null; state.fileSel = null; render() } }
     else if (e.key === 'h') $('#help').style.display = $('#help').style.display === 'flex' ? 'none' : 'flex'
     else if (e.key === 'r') resetAll()
     else if (e.key === 'v' && state.sel && changedIds().includes(state.sel)) { setReviewed(state.sel, !reviewed().has(state.sel)); render() }
@@ -394,6 +447,54 @@ $('#only-changed').addEventListener('click', (e) => { state.onlyChanged = !state
     else if (e.key === '[') togglePane('left')
     else if (e.key === ']') togglePane('right')
   })
+})()
+// ---- multi-select: right-click draws a dashed lasso over UML nodes ----
+;(() => {
+  const stage = $('#stage'), svg = $('#svg'), lasso = $('#lasso'), menu = $('#selmenu')
+  let box = null
+  const svgRect = () => svg.getBoundingClientRect()
+  const nodeScreenRect = (id) => { const p = lastLayout && lastLayout.pos.get(id); if (!p) return null; return { x: view.x + p.x * view.k, y: view.y + p.y * view.k, w: p.w * view.k, h: p.h * view.k } }
+  stage.addEventListener('contextmenu', (e) => e.preventDefault())
+  stage.addEventListener('mousedown', (e) => {
+    if (e.button !== 2) return
+    e.preventDefault()
+    const r = svgRect(), clicked = e.target.closest('.node')
+    box = { startX: e.clientX - r.left, startY: e.clientY - r.top, shift: e.shiftKey, moved: false, clickedId: clicked ? clicked.__nodeId : null }
+    menu.style.display = 'none'
+  })
+  window.addEventListener('mousemove', (e) => {
+    if (!box) return
+    const r = svgRect(), sx = e.clientX - r.left, sy = e.clientY - r.top
+    const dx = sx - box.startX, dy = sy - box.startY
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) box.moved = true
+    if (!box.moved) return
+    const x = Math.min(sx, box.startX), y = Math.min(sy, box.startY)
+    box.rect = { x, y, w: Math.abs(dx), h: Math.abs(dy) }
+    lasso.style.display = 'block'; lasso.style.left = x + 'px'; lasso.style.top = y + 'px'; lasso.style.width = box.rect.w + 'px'; lasso.style.height = box.rect.h + 'px'
+  })
+  window.addEventListener('mouseup', (e) => {
+    if (!box) return
+    if (box.moved && box.rect && lastLayout) {
+      const hits = []
+      for (const id of lastLayout.pos.keys()) { const sr = nodeScreenRect(id); if (sr && sr.x < box.rect.x + box.rect.w && sr.x + sr.w > box.rect.x && sr.y < box.rect.y + box.rect.h && sr.y + sr.h > box.rect.y) hits.push(id) }
+      if (box.shift) hits.forEach((id) => state.groupSel.add(id)); else state.groupSel = new Set(hits)
+    } else if (box.clickedId) {
+      if (box.shift) state.groupSel.add(box.clickedId)
+      else if (state.groupSel.has(box.clickedId)) state.groupSel.delete(box.clickedId)
+    }
+    lasso.style.display = 'none'
+    render()
+    if (state.groupSel.size) { const r = svgRect(); menu.style.left = (e.clientX - r.left) + 'px'; menu.style.top = (e.clientY - r.top) + 'px'; menu.style.display = 'block' }
+    box = null
+  })
+  window.addEventListener('mousedown', (e) => { if (e.button === 0 && !e.target.closest('#selmenu')) menu.style.display = 'none' })
+  $('#btn-minimize').addEventListener('click', () => {
+    for (const id of state.groupSel) if (!state.minimized.includes(id)) state.minimized.push(id)
+    state.groupSel.clear()
+    menu.style.display = 'none'
+    render()
+  })
+  $('#btn-minbar-toggle').addEventListener('click', () => { const s = $('#min-stack'); s.style.display = s.style.display === 'block' ? 'none' : 'block' })
 })()
 $('#btn-left').addEventListener('click', () => togglePane('left'))
 $('#btn-right').addEventListener('click', () => togglePane('right'))
