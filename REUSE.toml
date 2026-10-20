@@ -1,0 +1,7 @@
+version = 1
+
+[[annotations]]
+path = ["**/*.json", "**/*.md", "NOTICE", "LICENSE", "REUSE.toml", ".gitignore", "examples/fixture-project/**", "examples/work-items.json"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Michael Jacobs"
+SPDX-License-Identifier = "Apache-2.0"
