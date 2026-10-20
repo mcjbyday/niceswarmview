@@ -1,18 +1,21 @@
 #!/bin/bash
-# Order exec for a city: snapshot and delta every closed bead that carries a
-# work commit and has no delta yet. Runs in the controller's minimal
-# environment (see the adapter notes): PATH is set here, output goes
-# to <city>/.gc/runtime/swarmview.log, and rig commands run with the city
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Michael Jacobs
+# Gas City hook (order exec on bead.closed): snapshot and delta every closed
+# bead that carries a work commit and has no delta yet. Runs in the
+# controller's minimal environment: PATH is set here (NICESWARMVIEW_TOOL_PATH
+# names the folder holding gc, bd, jq and node), output goes to
+# <city>/.gc/runtime/niceswarmview.log, and rig commands run with the city
 # store's GC_* / BEADS_* variables cleared so bd reads the rig's own store.
 # No model calls. Idempotent: a bead with an existing delta file is skipped.
-#   orders/swarmview-snapshot.toml: trigger = "event", on = "bead.closed"
-#   manual: GC_CITY=<city> bin/on-bead-close.sh
+#   orders/niceswarmview-snapshot.toml: trigger = "event", on = "bead.closed"
+#   manual: GC_CITY=<city> adapters/gascity/on-work-item-closed.sh
 set -u
-export PATH="/usr/local/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
-SELF="$(cd "$(dirname "$0")/.." && pwd)"
+export PATH="${NICESWARMVIEW_TOOL_PATH:-/usr/local/bin}:/usr/bin:/bin:${PATH:-}"
+SELF="$(cd "$(dirname "$0")/../.." && pwd)"
 CITY="${GC_CITY:-$(pwd)}"
 CITY_NAME="$(basename "$CITY")"
-LOG="$CITY/.gc/runtime/swarmview.log"
+LOG="$CITY/.gc/runtime/niceswarmview.log"
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
 echo "$(date -u +%FT%TZ) run city=$CITY_NAME"
@@ -35,7 +38,7 @@ gc rig list --json 2>/dev/null | jq -r '.rigs[] | select(.hq|not) | "\(.name)\t\
           if git -C "$path" merge-base --is-ancestor "$s" "$commit" 2>/dev/null; then base="$s"; break; fi
         done
         [ -n "$base" ] || base="$commit^"
-        if clean node "$SELF/bin/delta.mjs" --city "$CITY_NAME" --rig "$path" --name "$name" --base "$base" --head "$commit" --id "$bead" --bead "$bead"; then
+        if clean node "$SELF/core/delta.mjs" --adapter gascity --workspace "$CITY_NAME" --project "$path" --name "$name" --base "$base" --head "$commit" --id "$bead" --item "$bead"; then
           echo "delta $name $bead ($base..$commit)"
         else
           echo "FAILED $name $bead" >&2

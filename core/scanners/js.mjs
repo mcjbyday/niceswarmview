@@ -1,4 +1,6 @@
-// JavaScript / TypeScript module scanner for swarmview snapshots.
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Michael Jacobs
+// JavaScript / TypeScript module scanner for niceswarmview snapshots.
 // One node per module file. Regex based (no AST dependency): good enough to
 // orient a review, as uml-viewer's own TypeScript scanner is for layout.
 import fs from 'node:fs'

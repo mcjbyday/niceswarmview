@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 Michael Jacobs
 // Scanner tests: run with `node --test tests/` (add --experimental-test-coverage for coverage).
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -6,10 +8,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { scanJs } from '../scanners/js.mjs'
+import { scanJs } from '../core/scanners/js.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'swarmview-test-'))
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'niceswarmview-test-'))
 const write = (root, rel, src) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), src) }
 
 test('js scanner: components, default export, local imports, assets, children, hooks, routes', () => {
@@ -33,7 +35,7 @@ test('python scanner: classes with bases, functions, relative and absolute impor
   write(root, 'pkg/__init__.py', '')
   write(root, 'pkg/base.py', 'class Base:\n    def run(self): pass\n')
   write(root, 'pkg/impl.py', 'from .base import Base\nimport pkg.base\nimport json\n\nclass Impl(Base):\n    pass\n\ndef helper(x):\n    return x\n')
-  const out = JSON.parse(execFileSync('python3', [path.join(REPO, 'scanners/py_ast.py'), root], { input: JSON.stringify(['pkg/__init__.py', 'pkg/base.py', 'pkg/impl.py']), encoding: 'utf8' }))
+  const out = JSON.parse(execFileSync('python3', [path.join(REPO, 'core/scanners/py_ast.py'), root], { input: JSON.stringify(['pkg/__init__.py', 'pkg/base.py', 'pkg/impl.py']), encoding: 'utf8' }))
   const impl = out.find((m) => m.id === 'pkg/impl')
   assert.deepEqual(impl.imports, ['pkg/base'])
   assert.deepEqual(impl.foreign, ['json'])

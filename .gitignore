@@ -1,17 +1,4 @@
 .DS_Store
 local_*/
 node_modules/
-.gc/
-worktrees/
-.claude/skills/
-
-# Beads / Dolt files (added by bd init)
-.dolt/
-*.db
-.beads-credential-key
-.beads/proxieddb/
-*.gate.lock*
-
-# Gas City
-.beads/*
-!.beads/identity.toml
+coverage/

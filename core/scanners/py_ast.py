@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Python module scanner for swarmview snapshots.
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Michael Jacobs
+"""Python module scanner for niceswarmview snapshots.
 
 Reads a JSON list of relative .py paths on stdin, resolves them under ROOT
 (argv[1]), and prints one JSON object per module: members (classes with
