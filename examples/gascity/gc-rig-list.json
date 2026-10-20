@@ -1,0 +1,4 @@
+{ "rigs": [
+  { "name": "demo", "path": "/tmp/demo-city", "default_branch": "main", "hq": true },
+  { "name": "fixture-project", "path": "/tmp/niceswarmview-fixture", "default_branch": "main", "hq": false }
+] }

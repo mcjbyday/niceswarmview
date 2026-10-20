@@ -1,0 +1,9 @@
+{
+  "workItems": [
+    { "id": "ab-123", "title": "Add Card component and render one per project", "status": "closed", "type": "task",
+      "labels": ["wave1"], "closedAt": "2026-01-02T00:00:00Z", "workCommit": null, "workBranch": "feature-branch",
+      "verification": "node --test", "outcome": "shipped",
+      "note": "Card.js was added and App.js now imports it and renders one Card per project. Open App.js first: the import and the map are the whole change." }
+  ],
+  "projects": [ { "name": "fixture-project", "path": "/tmp/niceswarmview-fixture", "defaultBranch": "main" } ]
+}

@@ -1,0 +1,8 @@
+[
+  { "id": "ab-123", "title": "Add Card component and render one per project", "status": "closed", "issue_type": "task",
+    "labels": ["wave1"], "closed_at": "2026-01-02T00:00:00Z",
+    "metadata": { "gc.work_commit": "0000000000000000000000000000000000000000", "gc.work_branch": "feature-branch",
+                  "gc.work_verification": "node --test", "gc.work_outcome": "shipped", "design": "why a Card and not a list item: reuse" },
+    "notes": "Done: added Card.js. Verification: node --test.\n\nShift note: Card.js was added and App.js now imports it. Open App.js first.\n\nCommit step done." },
+  { "id": "ab-124", "title": "Open item with no work yet", "status": "open", "issue_type": "task", "labels": [], "metadata": {}, "notes": "" }
+]

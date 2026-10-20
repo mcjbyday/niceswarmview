@@ -1,0 +1,2 @@
+[{"file": "pkg/impl.py", "function": "helper", "complexity": 2, "coverage_percent": 50.0, "crap": 2.5},
+ {"file": "pkg/impl.py", "function": "Impl.run", "complexity": 1, "coverage_percent": 100.0, "crap": 1.0}]

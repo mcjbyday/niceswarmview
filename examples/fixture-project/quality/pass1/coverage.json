@@ -1,0 +1,5 @@
+{"meta": {"format": 3, "version": "7.0", "timestamp": "2026-01-01T00:00:00", "branch_coverage": true},
+ "files": {
+  "pkg/__init__.py": {"summary": {"covered_lines": 0, "num_statements": 0, "percent_covered": 100.0, "percent_branches_covered": 100.0}},
+  "pkg/base.py": {"summary": {"covered_lines": 3, "num_statements": 3, "percent_covered": 100.0, "percent_branches_covered": 100.0}},
+  "pkg/impl.py": {"summary": {"covered_lines": 7, "num_statements": 9, "percent_covered": 77.8, "percent_branches_covered": 50.0}}}}

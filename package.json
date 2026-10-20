@@ -1,0 +1,13 @@
+{
+  "name": "niceswarmview",
+  "version": "0.1.0",
+  "description": "Model-level viewer for work done by agent swarms: module graphs, wave deltas, work items joined through adapters",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "serve": "bin/serve.sh"
+  }
+}

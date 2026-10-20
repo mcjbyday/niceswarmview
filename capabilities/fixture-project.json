@@ -1,0 +1,15 @@
+{
+  "project": "fixture-project",
+  "title": "Fixture project: what a user can do",
+  "summary": "Authored layer for the example tree. Capabilities are written by people; the viewer maps each one to the modules that implement it.",
+  "status": "example",
+  "layers": [
+    { "id": "user", "title": "User actions", "description": "What someone using the app can do.", "items": [
+      { "id": "browse", "title": "Browse the project list", "modules": ["src/App", "src/components/Top", "src/data/projects"] },
+      { "id": "cards", "title": "See one card per project", "modules": ["src/components/Card"], "status": "added in wave 1" }
+    ] },
+    { "id": "engine", "title": "Engine", "description": "The Python side.", "items": [
+      { "id": "run", "title": "Run the implementation", "modules": ["pkg/impl", "pkg/base"] }
+    ] }
+  ]
+}
